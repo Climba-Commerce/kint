@@ -1,25 +1,24 @@
 if (typeof window.kintRich === 'undefined') {
-    window.kintRich = (function() {
+    window.kintRich = (function () {
         'use strict';
 
         var kintRich = {
-            selectText: function(element) {
+            selectText: function (element) {
                 var selection = window.getSelection();
                 var range = document.createRange();
 
-                range.selectNodeContents(element.lastChild);
-                range.setStart(element.firstChild, 0);
+                range.selectNodeContents(element);
                 selection.removeAllRanges();
                 selection.addRange(range);
             },
 
-            each: function(selector, callback) {
+            each: function (selector, callback) {
                 Array.prototype.slice
                     .call(document.querySelectorAll(selector), 0)
                     .forEach(callback);
             },
 
-            hasClass: function(target, className) {
+            hasClass: function (target, className) {
                 if (!target.classList) {
                     return false;
                 }
@@ -30,14 +29,14 @@ if (typeof window.kintRich === 'undefined') {
                 return target.classList.contains(className);
             },
 
-            addClass: function(target, className) {
+            addClass: function (target, className) {
                 if (typeof className === 'undefined') {
                     className = 'kint-show';
                 }
                 target.classList.add(className);
             },
 
-            removeClass: function(target, className) {
+            removeClass: function (target, className) {
                 if (typeof className === 'undefined') {
                     className = 'kint-show';
                 }
@@ -45,7 +44,7 @@ if (typeof window.kintRich === 'undefined') {
                 return target;
             },
 
-            toggle: function(element, hide) {
+            toggle: function (element, hide) {
                 var parent = kintRich.getChildren(element);
 
                 if (!parent) {
@@ -72,7 +71,7 @@ if (typeof window.kintRich === 'undefined') {
                 }
             },
 
-            toggleChildren: function(element, hide) {
+            toggleChildren: function (element, hide) {
                 var parent = kintRich.getChildren(element);
 
                 if (!parent) {
@@ -91,7 +90,7 @@ if (typeof window.kintRich === 'undefined') {
                 }
             },
 
-            toggleAll: function(caret) {
+            toggleAll: function (caret) {
                 var elements = document.getElementsByClassName('kint-parent');
                 var i = elements.length;
                 var visible = !kintRich.hasClass(caret.parentNode);
@@ -101,7 +100,7 @@ if (typeof window.kintRich === 'undefined') {
                 }
             },
 
-            switchTab: function(target) {
+            switchTab: function (target) {
                 var lis;
                 var el = target.previousSibling;
                 var index = 0;
@@ -125,7 +124,7 @@ if (typeof window.kintRich === 'undefined') {
 
                 for (var i = 0; i < lis.length; i++) {
                     if (i === index) {
-                        lis[i].style.display = 'block';
+                        kintRich.addClass(lis[i]);
 
                         if (lis[i].childNodes.length === 1) {
                             el = lis[i].childNodes[0].childNodes[0];
@@ -135,18 +134,18 @@ if (typeof window.kintRich === 'undefined') {
                             }
                         }
                     } else {
-                        lis[i].style.display = 'none';
+                        kintRich.removeClass(lis[i]);
                     }
                 }
             },
 
             // Shitty people using shitty regex fuck up the JS when they see <head> or <meta charset>
             // so we have to write this obfuscation to make sure it works after minification
-            mktag: function(contents) {
+            mktag: function (contents) {
                 return '<' + contents + '>';
             },
 
-            openInNewWindow: function(kintContainer) {
+            openInNewWindow: function (kintContainer) {
                 var newWindow = window.open();
 
                 if (newWindow) {
@@ -174,12 +173,12 @@ if (typeof window.kintRich === 'undefined') {
                 }
             },
 
-            sortTable: function(table, column) {
+            sortTable: function (table, column) {
                 var tbody = table.tBodies[0];
 
                 [].slice
                     .call(table.tBodies[0].rows)
-                    .sort(function(a, b) {
+                    .sort(function (a, b) {
                         a = a.cells[column].textContent.trim().toLocaleLowerCase();
                         b = b.cells[column].textContent.trim().toLocaleLowerCase();
 
@@ -202,12 +201,12 @@ if (typeof window.kintRich === 'undefined') {
 
                         return 0;
                     })
-                    .forEach(function(el) {
+                    .forEach(function (el) {
                         tbody.appendChild(el);
                     });
             },
 
-            showAccessPath: function(target) {
+            showAccessPath: function (target) {
                 var nodes = target.childNodes;
 
                 for (var i = 0; i < nodes.length; i++) {
@@ -223,103 +222,114 @@ if (typeof window.kintRich === 'undefined') {
                 }
             },
 
-            showSearchBox: function(target) {
+            showSearchBox: function (target) {
                 var input = target.querySelector('.kint-search');
 
-                if (input) {
-                    if (kintRich.hasClass(input)) {
-                        kintRich.removeClass(input);
-                        kintRich.removeClass(target.parentNode, 'kint-search-root');
-                    } else {
-                        kintRich.addClass(target);
-                        kintRich.addClass(input);
-                        input.focus();
-                        input.select();
-                        kintRich.search(input);
-                    }
+                if (!input) {
+                    return;
                 }
-            },
 
-            search: function(input) {
-                var obj = input.parentNode.parentNode;
-
-                if (input.value.length) {
-                    var results = kintRich.findMatches(obj, input.value);
-                    kintRich.highlightMatches(obj, results);
+                if (kintRich.hasClass(input)) {
+                    kintRich.removeClass(input);
+                    kintRich.removeClass(target.parentNode, 'kint-search-root');
                 } else {
-                    kintRich.removeClass(obj, 'kint-search-root');
+                    kintRich.addClass(target);
+                    kintRich.addClass(input);
+                    input.focus();
+                    input.select();
+                    kintRich.search(target.parentNode, input.value);
                 }
             },
 
-            findMatches: function(el, term) {
-                var children = null;
+            search: function (el, input) {
+                var oldmatches = el.querySelectorAll('.kint-search-match');
 
-                for (var i = 0; i < el.children.length; i++) {
-                    if (el.children[i].tagName === 'DD') {
-                        children = el.children[i];
+                [].forEach.call(oldmatches, function (match) {
+                    kintRich.removeClass(match, 'kint-search-match');
+                });
+                kintRich.removeClass(el, 'kint-search-match');
+
+                if (input.length) {
+                    kintRich.addClass(el, 'kint-search-root');
+                    kintRich.findMatches(el, input);
+                } else {
+                    kintRich.removeClass(el, 'kint-search-root');
+                }
+            },
+
+            findMatches: function (el, term) {
+                var cleaned = el.cloneNode(true);
+                cleaned.querySelectorAll('.access-path').forEach(function (e) {
+                    e.remove();
+                });
+
+                if (cleaned.textContent.toUpperCase().indexOf(term.toUpperCase()) == -1) {
+                    return;
+                }
+
+                kintRich.addClass(el, 'kint-search-match');
+
+                var node;
+
+                for (var index in el.childNodes) {
+                    if (el.childNodes[index].tagName == 'DD') {
+                        node = el.childNodes[index];
                         break;
                     }
                 }
 
-                if (!children) {
-                    return [];
+                if (!node) {
+                    return;
                 }
 
-                var searchTargets = children.querySelectorAll('dfn');
-                var found = [];
+                var tabs;
+                var tabcontents;
 
-                term = term.toLowerCase();
-
-                [].forEach.call(searchTargets, function(dfn) {
-                    if (dfn.innerText.toLowerCase().indexOf(term) != -1) {
-                        found.push(dfn);
-                    }
-                });
-
-                return found;
-            },
-
-            highlightMatches: function(el, matches) {
-                var oldmatches = el.querySelectorAll('.kint-search-match');
-
-                [].forEach.call(oldmatches, function(match) {
-                    kintRich.removeClass(match, 'kint-search-match');
-                });
-
-                kintRich.addClass(el, 'kint-search-root');
-
-                for (var i = 0; i < matches.length; i++) {
-                    var cursor = matches[i];
-
-                    while (cursor != el) {
-                        if (cursor.tagName === 'DL') {
-                            kintRich.addClass(cursor, 'kint-search-match');
-                        } else if (cursor.tagName === 'LI') {
-                            if (
-                                cursor.parentNode.previousElementSibling.classList.contains(
-                                    'kint-tabs'
-                                )
-                            ) {
-                                var j = [].slice.call(cursor.parentNode.children).indexOf(cursor);
-                                kintRich.addClass(
-                                    [].slice.call(
-                                        cursor.parentNode.previousElementSibling.children
-                                    )[j],
-                                    'kint-search-match'
-                                );
-                            }
-
-                            cursor = cursor.parentNode;
+                [].forEach.call(node.childNodes, function (node) {
+                    if (node.tagName == 'DL') {
+                        kintRich.findMatches(node, term);
+                    } else if (node.tagName == 'UL') {
+                        if (kintRich.hasClass(node, 'kint-tabs')) {
+                            tabs = node.childNodes;
+                        } else if (kintRich.hasClass(node, 'kint-tab-contents')) {
+                            tabcontents = node.childNodes;
                         }
+                    }
+                });
 
-                        cursor = cursor.parentNode;
+                if (!tabs || !tabcontents || tabs.length != tabcontents.length) {
+                    return;
+                }
+
+                for (var index = 0; index < tabs.length; index++) {
+                    var matched = false;
+
+                    if (tabs[index].textContent.toUpperCase().indexOf(term.toUpperCase()) != -1) {
+                        matched = true;
+                    } else {
+                        cleaned = tabcontents[index].cloneNode(true);
+                        cleaned.querySelectorAll('.access-path').forEach(function (e) {
+                            e.remove();
+                        });
+
+                        if (cleaned.textContent.toUpperCase().indexOf(term.toUpperCase()) != -1) {
+                            matched = true;
+                        }
                     }
 
-                    kintRich.addClass(matches[i], 'kint-search-match');
+                    if (matched) {
+                        kintRich.addClass(tabs[index], 'kint-search-match');
+
+                        [].forEach.call(tabcontents[index].childNodes, function (node) {
+                            if (node.tagName == 'DL') {
+                                kintRich.findMatches(node, term);
+                            }
+                        });
+                    }
                 }
             },
 
-            getParentByClass: function(el, className) {
+            getParentByClass: function (el, className) {
                 if (typeof className === 'undefined') {
                     className = 'kint-rich';
                 }
@@ -334,7 +344,7 @@ if (typeof window.kintRich === 'undefined') {
                 return el;
             },
 
-            getParentHeader: function(el, allowChildren) {
+            getParentHeader: function (el, allowChildren) {
                 var nodeName = el.nodeName.toLowerCase();
 
                 while (nodeName !== 'dd' && nodeName !== 'dt' && kintRich.getParentByClass(el)) {
@@ -359,11 +369,75 @@ if (typeof window.kintRich === 'undefined') {
                 }
             },
 
-            getChildren: function(element) {
+            getChildren: function (element) {
                 do {
                     element = element.nextElementSibling;
                 } while (element && element.nodeName.toLowerCase() !== 'dd');
                 return element;
+            },
+
+            isFolderOpen: function () {
+                if (!kintRich.folder || !kintRich.folder.querySelector('dd.kint-foldout')) {
+                    return undefined;
+                }
+
+                return kintRich.hasClass(
+                    kintRich.folder.querySelector('dd.kint-foldout').previousSibling
+                );
+            },
+
+            initLoad: function () {
+                kintRich.style = window.kintShared.dedupe('style.kint-rich-style', kintRich.style);
+                kintRich.script = window.kintShared.dedupe(
+                    'script.kint-rich-script',
+                    kintRich.script
+                );
+                kintRich.folder = window.kintShared.dedupe(
+                    '.kint-rich.kint-folder',
+                    kintRich.folder
+                );
+
+                var searchboxes = document.querySelectorAll('input.kint-search');
+
+                [].forEach.call(searchboxes, function (input) {
+                    var timeout = null;
+                    var value = null;
+
+                    var searchfunc = function (e) {
+                        window.clearTimeout(timeout);
+
+                        if (input.value === value) {
+                            return;
+                        }
+
+                        timeout = window.setTimeout(function () {
+                            value = input.value;
+                            kintRich.search(input.parentNode.parentNode, value);
+                        }, 500);
+                    };
+
+                    input.removeEventListener('keyup', searchfunc);
+                    input.addEventListener('keyup', searchfunc);
+                });
+
+                if (!kintRich.folder) {
+                    return;
+                }
+
+                var container = kintRich.folder.querySelector('dd');
+
+                // Add kint dumps to folder
+                [].forEach.call(document.querySelectorAll('.kint-rich.kint-file'), function (elem) {
+                    if (elem.parentNode === kintRich.folder) {
+                        return;
+                    }
+
+                    container.appendChild(elem);
+                });
+
+                document.body.appendChild(kintRich.folder);
+
+                kintRich.addClass(kintRich.folder);
             },
 
             keyboardNav: {
@@ -371,18 +445,32 @@ if (typeof window.kintRich === 'undefined') {
                 target: 0, // currently selected caret
                 active: false,
 
-                fetchTargets: function() {
+                fetchTargets: function () {
+                    var selected = kintRich.keyboardNav.targets[kintRich.keyboardNav.target];
+
                     kintRich.keyboardNav.targets = [];
-                    kintRich.each('.kint-rich nav, .kint-tabs>li:not(.kint-active-tab)', function(
-                        el
-                    ) {
-                        if (el.offsetWidth !== 0 || el.offsetHeight !== 0) {
-                            kintRich.keyboardNav.targets.push(el);
+                    kintRich.each(
+                        '.kint-rich nav, .kint-tabs>li:not(.kint-active-tab)',
+                        function (el) {
+                            // Don't add targets outside of folder if folder is open
+                            if (kintRich.isFolderOpen() && !kintRich.folder.contains(el)) {
+                                return;
+                            }
+
+                            // Don't add hidden targets (Inside tabs, inside folder)
+                            if (el.offsetWidth !== 0 || el.offsetHeight !== 0) {
+                                kintRich.keyboardNav.targets.push(el);
+                            }
                         }
-                    });
+                    );
+
+                    if (selected && kintRich.keyboardNav.targets.indexOf(selected) !== -1) {
+                        kintRich.keyboardNav.target =
+                            kintRich.keyboardNav.targets.indexOf(selected);
+                    }
                 },
 
-                sync: function(noscroll) {
+                sync: function (noscroll) {
                     var prevElement = document.querySelector('.kint-focused');
                     if (prevElement) {
                         kintRich.removeClass(prevElement, 'kint-focused');
@@ -392,28 +480,34 @@ if (typeof window.kintRich === 'undefined') {
                         var el = kintRich.keyboardNav.targets[kintRich.keyboardNav.target];
                         kintRich.addClass(el, 'kint-focused');
 
+                        // Generally speaking keyboard navigation should result
+                        // in a scroll and mouse navigation shouldn't
                         if (!noscroll) {
                             kintRich.keyboardNav.scroll(el);
                         }
                     }
                 },
 
-                scroll: function(el) {
-                    var offsetTop = function(el) {
+                scroll: function (el) {
+                    if (el === kintRich.folder.querySelector('dt > nav')) {
+                        return;
+                    }
+
+                    var offsetTop = function (el) {
                         return el.offsetTop + (el.offsetParent ? offsetTop(el.offsetParent) : 0);
                     };
 
                     var top = offsetTop(el);
 
-                    if (kintRich.folder) {
-                        var container = kintRich.folder.querySelector('dd.kint-folder');
+                    if (kintRich.isFolderOpen()) {
+                        var container = kintRich.folder.querySelector('dd.kint-foldout');
                         container.scrollTo(0, top - container.clientHeight / 2);
                     } else {
                         window.scrollTo(0, top - window.innerHeight / 2);
                     }
                 },
 
-                moveCursor: function(diff) {
+                moveCursor: function (diff) {
                     kintRich.keyboardNav.target += diff;
 
                     while (kintRich.keyboardNav.target < 0) {
@@ -426,7 +520,12 @@ if (typeof window.kintRich === 'undefined') {
                     kintRich.keyboardNav.sync();
                 },
 
-                setCursor: function(elem) {
+                setCursor: function (elem) {
+                    // Refuse to set cursor outside of folder if folder is open
+                    if (kintRich.isFolderOpen() && !kintRich.folder.contains(elem)) {
+                        return false;
+                    }
+
                     kintRich.keyboardNav.fetchTargets();
 
                     for (var i = 0; i < kintRich.keyboardNav.targets.length; i++) {
@@ -445,9 +544,9 @@ if (typeof window.kintRich === 'undefined') {
                 lastClickTimer: null,
                 lastClickCount: 0,
 
-                renewLastClick: function() {
+                renewLastClick: function () {
                     window.clearTimeout(kintRich.mouseNav.lastClickTimer);
-                    kintRich.mouseNav.lastClickTimer = window.setTimeout(function() {
+                    kintRich.mouseNav.lastClickTimer = window.setTimeout(function () {
                         kintRich.mouseNav.lastClickTarget = null;
                         kintRich.mouseNav.lastClickTimer = null;
                         kintRich.mouseNav.lastClickCount = 0;
@@ -455,12 +554,14 @@ if (typeof window.kintRich === 'undefined') {
                 },
             },
 
+            style: null,
+            script: null,
             folder: null,
         };
 
         window.addEventListener(
             'click',
-            function(e) {
+            function (e) {
                 var target = e.target;
                 var nodeName = target.nodeName.toLowerCase();
 
@@ -490,7 +591,7 @@ if (typeof window.kintRich === 'undefined') {
                         kintRich.mouseNav.lastClickCount = 0;
                     }
 
-                    return false;
+                    return;
                 }
 
                 if (!kintRich.getParentByClass(target)) {
@@ -507,7 +608,7 @@ if (typeof window.kintRich === 'undefined') {
                             target.cellIndex
                         );
                     }
-                    return false;
+                    return;
                 }
 
                 // Ensure the header at least is selected
@@ -529,7 +630,6 @@ if (typeof window.kintRich === 'undefined') {
                         kintRich.keyboardNav.setCursor(target.querySelector('nav'));
                         kintRich.keyboardNav.sync(true);
                     }
-                    return false;
                 } else if (nodeName === 'nav') {
                     // handle clicks on the navigation caret
                     if (target.parentNode.nodeName.toLowerCase() === 'footer') {
@@ -549,8 +649,6 @@ if (typeof window.kintRich === 'undefined') {
                         kintRich.mouseNav.lastClickTarget = target;
                         kintRich.mouseNav.renewLastClick();
                     }
-
-                    return false;
                 } else if (kintRich.hasClass(target, 'kint-popup-trigger')) {
                     var kintContainer = target.parentNode;
                     if (kintContainer.nodeName.toLowerCase() === 'footer') {
@@ -564,12 +662,9 @@ if (typeof window.kintRich === 'undefined') {
                     kintRich.openInNewWindow(kintContainer);
                 } else if (kintRich.hasClass(target, 'kint-access-path-trigger')) {
                     kintRich.showAccessPath(target.parentNode);
-                    return false;
                 } else if (kintRich.hasClass(target, 'kint-search-trigger')) {
                     kintRich.showSearchBox(target.parentNode);
-                    return false;
                 } else if (kintRich.hasClass(target, 'kint-search')) {
-                    return true;
                 } else if (nodeName === 'pre' && e.detail === 3) {
                     // triple click pre to select it all
                     kintRich.selectText(target);
@@ -583,184 +678,153 @@ if (typeof window.kintRich === 'undefined') {
                         kintRich.toggle(target);
                         kintRich.keyboardNav.fetchTargets();
                     }
-                    return false;
                 }
             },
-            false
+            true
         );
 
         // keyboard navigation
-        window.onkeydown = function(e) {
-            // direct assignment is used to have priority over ex FAYT
-            // do nothing if alt/ctrl key is pressed or if we're actually typing somewhere
-            if (e.target !== document.body || e.altKey || e.ctrlKey) {
-                return;
-            }
-
-            if (e.keyCode === 68) {
-                // 'd' : toggles navigation on/off
-                if (kintRich.keyboardNav.active) {
-                    kintRich.keyboardNav.active = false;
-                } else {
-                    kintRich.keyboardNav.active = true;
-                    kintRich.keyboardNav.fetchTargets();
-
-                    if (kintRich.keyboardNav.targets.length === 0) {
-                        kintRich.keyboardNav.active = false;
-                        return true;
-                    }
-                }
-
-                kintRich.keyboardNav.sync();
-                return false;
-            } else if (!kintRich.keyboardNav.active) {
-                return true;
-            } else if (e.keyCode === 9) {
-                // TAB : moves up/down depending on shift key
-                kintRich.keyboardNav.moveCursor(e.shiftKey ? -1 : 1);
-                return false;
-            } else if (e.keyCode === 38 || e.keyCode === 75) {
-                // ARROW UP : moves up
-                kintRich.keyboardNav.moveCursor(-1);
-                return false;
-            } else if (e.keyCode === 40 || e.keyCode === 74) {
-                // ARROW DOWN : down
-                kintRich.keyboardNav.moveCursor(1);
-                return false;
-            }
-
-            var kintNode = kintRich.keyboardNav.targets[kintRich.keyboardNav.target];
-            if (kintNode.nodeName.toLowerCase() === 'li') {
-                // we're on a trace tab
-                if (e.keyCode === 32 || e.keyCode === 13) {
-                    // SPACE/ENTER
-                    kintRich.switchTab(kintNode);
-                    kintRich.keyboardNav.fetchTargets();
-                    kintRich.keyboardNav.sync();
-                    return false;
-                } else if (e.keyCode === 39 || e.keyCode === 76) {
-                    // arrows
-                    kintRich.keyboardNav.moveCursor(1);
-                    return false;
-                } else if (e.keyCode === 37 || e.keyCode === 72) {
-                    kintRich.keyboardNav.moveCursor(-1);
-                    return false;
-                }
-            }
-
-            // simple dump
-            kintNode = kintNode.parentNode;
-
-            if (e.keyCode === 65) {
-                // 'a' : toggles access path on/off
-                kintRich.showAccessPath(kintNode);
-                return false;
-            } else if (
-                kintNode.nodeName.toLowerCase() === 'footer' &&
-                kintRich.hasClass(kintNode.parentNode, 'kint-rich')
-            ) {
-                // Minitrace needs special class handling
-                if (e.keyCode === 32 || e.keyCode === 13) {
-                    if (kintRich.hasClass(kintNode)) {
-                        kintRich.removeClass(kintNode);
-                    } else {
-                        kintRich.addClass(kintNode);
-                    }
-                } else if (e.keyCode === 37 || e.keyCode === 72) {
-                    kintRich.removeClass(kintNode);
-                } else if (e.keyCode === 39 || e.keyCode === 76) {
-                    kintRich.addClass(kintNode);
-                } else {
-                    return true;
-                }
-
-                return false;
-            } else if (e.keyCode === 32 || e.keyCode === 13) {
-                // SPACE/ENTER : toggles
-                kintRich.toggle(kintNode);
-                kintRich.keyboardNav.fetchTargets();
-                return false;
-            } else if (
-                e.keyCode === 39 ||
-                e.keyCode === 76 ||
-                e.keyCode === 37 ||
-                e.keyCode === 72
-            ) {
-                // ARROW LEFT/RIGHT : respectively hides/shows and traverses
-                var hide = e.keyCode === 37 || e.keyCode === 72;
-
-                if (kintRich.hasClass(kintNode)) {
-                    // expand/collapse all children if immediate ones are showing
-                    kintRich.toggleChildren(kintNode, hide);
-                    kintRich.toggle(kintNode, hide);
-                } else {
-                    // traverse to parent and THEN hide
-                    if (hide) {
-                        var parent = kintRich.getParentHeader(kintNode.parentNode.parentNode, true);
-
-                        if (parent) {
-                            kintNode = parent;
-                            kintRich.keyboardNav.setCursor(kintNode.querySelector('nav'));
-                            kintRich.keyboardNav.sync();
-                        }
-                    }
-
-                    kintRich.toggle(kintNode, hide);
-                }
-
-                kintRich.keyboardNav.fetchTargets();
-                return false;
-            }
-        };
-
-        window.addEventListener('load', function() {
-            window.kintShared.dedupe([
-                'style.kint-rich-style',
-                'script.kint-rich-script',
-                '.kint-rich.kint-folder',
-            ]);
-
-            var searchboxes = document.querySelectorAll('input.kint-search');
-
-            [].forEach.call(searchboxes, function(input) {
-                var timeout = null;
-
-                input.addEventListener('keyup', function(e) {
-                    window.clearTimeout(timeout);
-
-                    if (input.value === value) {
-                        return;
-                    }
-
-                    var value = input.value;
-
-                    timeout = window.setTimeout(function() {
-                        kintRich.search(input);
-                    }, 500);
-                });
-            });
-
-            kintRich.folder = document.querySelector('.kint-rich.kint-folder');
-
-            if (!kintRich.folder) {
-                return;
-            }
-
-            var container = kintRich.folder.querySelector('dd');
-
-            // Add kint dumps to folder
-            [].forEach.call(document.querySelectorAll('.kint-rich'), function(elem) {
-                if (elem === kintRich.folder) {
+        window.addEventListener(
+            'keydown',
+            function (e) {
+                // do nothing if alt/ctrl key is pressed or if we're actually typing somewhere
+                if (e.target !== document.body || e.altKey || e.ctrlKey) {
                     return;
                 }
 
-                elem.parentNode.removeChild(elem);
-                container.appendChild(elem);
-            });
+                if (e.keyCode === 68) {
+                    // 'd' : toggles navigation on/off
+                    if (kintRich.keyboardNav.active) {
+                        kintRich.keyboardNav.active = false;
+                    } else {
+                        kintRich.keyboardNav.active = true;
+                        kintRich.keyboardNav.fetchTargets();
 
-            document.body.appendChild(kintRich.folder);
-        });
+                        if (kintRich.keyboardNav.targets.length === 0) {
+                            kintRich.keyboardNav.active = false;
+                            return;
+                        }
+                    }
+
+                    kintRich.keyboardNav.sync();
+                    e.preventDefault();
+                    return;
+                } else if (!kintRich.keyboardNav.active) {
+                    return;
+                } else if (e.keyCode === 9) {
+                    // TAB : moves up/down depending on shift key
+                    kintRich.keyboardNav.moveCursor(e.shiftKey ? -1 : 1);
+                    e.preventDefault();
+                    return;
+                } else if (e.keyCode === 38 || e.keyCode === 75) {
+                    // ARROW UP : moves up
+                    kintRich.keyboardNav.moveCursor(-1);
+                    e.preventDefault();
+                    return;
+                } else if (e.keyCode === 40 || e.keyCode === 74) {
+                    // ARROW DOWN : down
+                    kintRich.keyboardNav.moveCursor(1);
+                    e.preventDefault();
+                    return;
+                }
+
+                var kintNode = kintRich.keyboardNav.targets[kintRich.keyboardNav.target];
+                if (kintNode.nodeName.toLowerCase() === 'li') {
+                    // we're on a trace tab
+                    if (e.keyCode === 32 || e.keyCode === 13) {
+                        // SPACE/ENTER
+                        kintRich.switchTab(kintNode);
+                        kintRich.keyboardNav.fetchTargets();
+                        kintRich.keyboardNav.sync();
+                        e.preventDefault();
+                        return;
+                    } else if (e.keyCode === 39 || e.keyCode === 76) {
+                        // arrows
+                        kintRich.keyboardNav.moveCursor(1);
+                        e.preventDefault();
+                        return;
+                    } else if (e.keyCode === 37 || e.keyCode === 72) {
+                        kintRich.keyboardNav.moveCursor(-1);
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
+                // simple dump
+                kintNode = kintNode.parentNode;
+
+                if (e.keyCode === 65) {
+                    // 'a' : toggles access path on/off
+                    kintRich.showAccessPath(kintNode);
+                    e.preventDefault();
+                    return;
+                } else if (
+                    kintNode.nodeName.toLowerCase() === 'footer' &&
+                    kintRich.hasClass(kintNode.parentNode, 'kint-rich')
+                ) {
+                    // Minitrace needs special class handling
+                    if (e.keyCode === 32 || e.keyCode === 13) {
+                        if (kintRich.hasClass(kintNode)) {
+                            kintRich.removeClass(kintNode);
+                        } else {
+                            kintRich.addClass(kintNode);
+                        }
+                        e.preventDefault();
+                    } else if (e.keyCode === 37 || e.keyCode === 72) {
+                        kintRich.removeClass(kintNode);
+                        e.preventDefault();
+                    } else if (e.keyCode === 39 || e.keyCode === 76) {
+                        kintRich.addClass(kintNode);
+                        e.preventDefault();
+                    }
+                    return;
+                } else if (e.keyCode === 32 || e.keyCode === 13) {
+                    // SPACE/ENTER : toggles
+                    kintRich.toggle(kintNode);
+                    kintRich.keyboardNav.fetchTargets();
+                    e.preventDefault();
+                    return;
+                } else if (
+                    e.keyCode === 39 ||
+                    e.keyCode === 76 ||
+                    e.keyCode === 37 ||
+                    e.keyCode === 72
+                ) {
+                    // ARROW LEFT/RIGHT : respectively hides/shows and traverses
+                    var hide = e.keyCode === 37 || e.keyCode === 72;
+
+                    if (kintRich.hasClass(kintNode)) {
+                        // expand/collapse all children if immediate ones are showing
+                        kintRich.toggleChildren(kintNode, hide);
+                        kintRich.toggle(kintNode, hide);
+                    } else {
+                        // traverse to parent and THEN hide
+                        if (hide) {
+                            var parent = kintRich.getParentHeader(
+                                kintNode.parentNode.parentNode,
+                                true
+                            );
+
+                            if (parent) {
+                                kintNode = parent;
+                                kintRich.keyboardNav.setCursor(kintNode.querySelector('nav'));
+                                kintRich.keyboardNav.sync();
+                            }
+                        }
+
+                        kintRich.toggle(kintNode, hide);
+                    }
+
+                    kintRich.keyboardNav.fetchTargets();
+                    e.preventDefault();
+                    return;
+                }
+            },
+            true
+        );
 
         return kintRich;
     })();
 }
+
+window.kintShared.runOnce(window.kintRich.initLoad);

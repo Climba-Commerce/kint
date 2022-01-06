@@ -6,17 +6,13 @@
       "name": "Jonathan Vollebregt",
       "url": "https://github.com/jnvsor",
       "email": "jnvsor@gmail.com"
-    },
-    {
-      "name": "Rokas Šleinius",
-      "url": "https://github.com/raveren",
-      "email": "raveren@gmail.com"
     }
   ],
   "license": "MIT",
   "private": true,
   "devDependencies": {
-    "prettier": "^1",
+    "node-sass": "^5",
+    "prettier": "^2",
     "uglify-js": "^3"
   },
   "scripts": {
@@ -25,6 +21,8 @@
     "build:js:shared": "uglifyjs resources/js/shared.js -cm --verbose --warn > resources/compiled/shared.js",
     "build:js:rich": "uglifyjs resources/js/rich.js -cm --verbose --warn > resources/compiled/rich.js",
     "build:js:microtime": "uglifyjs resources/js/microtime.js -cm --verbose --warn > resources/compiled/microtime.js",
-    "build:js:plain": "uglifyjs resources/js/plain.js -cm --verbose --warn > resources/compiled/plain.js"
+    "build:js:plain": "uglifyjs resources/js/plain.js -cm --verbose --warn > resources/compiled/plain.js",
+    "format:sass": "prettier --write resources/sass/**",
+    "build:sass": "node-sass --recursive --output-style compressed resources/sass/ --output resources/compiled/"
   }
 }

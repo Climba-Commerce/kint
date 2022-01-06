@@ -1,7 +1,5 @@
 # Kint - debugging helper for PHP developers
 
-[![](https://travis-ci.org/kint-php/kint.svg?branch=master)](https://travis-ci.org/kint-php/kint)
-
 ![Screenshot](https://kint-php.github.io/kint/images/intro.png)
 
 ## What am I looking at?
@@ -24,7 +22,7 @@ require 'kint.phar';
 ### Or, if you use Composer:
 
 ```bash
-composer require idealizetecnologia/kint --dev
+composer require kint-php/kint --dev
 ```
 
 ## Usage
@@ -36,7 +34,6 @@ Kint::dump($GLOBALS, $_SERVER); // pass any number of parameters
 d($GLOBALS, $_SERVER); // or simply use d() as a shorthand
 
 Kint::trace(); // Debug backtrace
-d(1); // Debug backtrace shorthand
 
 s($GLOBALS); // Basic output mode
 
@@ -62,6 +59,8 @@ d('Get off my lawn!'); // Debugs no longer have any effect
 * Triple clicking the <kbd>+</kbd> sign in will open/close everything on the page.
 * Add heavy classes to the blacklist to improve performance:  
   `Kint\Parser\BlacklistPlugin::$shallow_blacklist[] = 'Psr\Container\ContainerInterface';`
+* To see the output in a docked toolbar at the bottom of the page:  
+  `Kint\Renderer\RichRenderer::$folder = true;`
 * To change display theme, use `Kint\Renderer\RichRenderer::$theme = 'theme.css';`. You can pass the absolute path to a CSS file, or use one of the built in themes:
     * `original.css` (default)
     * `solarized.css`
@@ -74,7 +73,7 @@ d('Get off my lawn!'); // Debugs no longer have any effect
 ## Authors
 
 [**Jonathan Vollebregt** (jnvsor)](https://github.com/jnvsor)  
-[**Rokas Šleinius** (raveren)](https://github.com/raveren)
+[Contributors](https://github.com/kint-php/kint/graphs/contributors)
 
 ## License
 

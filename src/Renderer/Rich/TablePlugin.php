@@ -25,9 +25,9 @@
 
 namespace Kint\Renderer\Rich;
 
-use Kint\Object\BlobObject;
-use Kint\Object\Representation\Representation;
 use Kint\Renderer\RichRenderer;
+use Kint\Utils;
+use Kint\Zval\Representation\Representation;
 
 class TablePlugin extends Plugin implements TabPluginInterface
 {
@@ -87,12 +87,16 @@ class TablePlugin extends Plugin implements TabPluginInterface
                         $out .= '<var>'.$ref.'null</var>';
                         break;
                     case 'string':
-                        $val = $field->value->contents;
-                        if (RichRenderer::$strlen_max && self::$respect_str_length && BlobObject::strlen($val) > RichRenderer::$strlen_max) {
-                            $val = \substr($val, 0, RichRenderer::$strlen_max).'...';
-                        }
+                        if ($field->encoding) {
+                            $val = $field->value->contents;
+                            if (RichRenderer::$strlen_max && self::$respect_str_length) {
+                                $val = Utils::truncateString($val, RichRenderer::$strlen_max);
+                            }
 
-                        $out .= $this->renderer->escape($val);
+                            $out .= $this->renderer->escape($val);
+                        } else {
+                            $out .= '<var>'.$type.'</var>';
+                        }
                         break;
                     case 'array':
                         $out .= '<var>'.$ref.'array</var>'.$size;
