@@ -25,25 +25,23 @@
 
 namespace Kint\Test;
 
+use DOMDocument;
+use DOMXPath;
 use Exception;
 use Kint\Kint;
-use Kint\Object\BlobObject;
 use Kint\Parser\Parser;
 use Kint\Parser\ProxyPlugin;
+use Kint\Renderer\CliRenderer;
+use Kint\Renderer\RichRenderer;
 use Kint\Renderer\TextRenderer;
+use Kint\Zval\BlobValue;
+use PHPUnit\Framework\AssertionFailedError;
+use PHPUnit\Framework\Exception as FrameworkException;
 use PHPUnit_Framework_AssertionFailedError;
 use PHPUnit_Framework_Exception;
 
 class IntegrationTest extends KintTestCase
 {
-    protected function setUp()
-    {
-        parent::setUp();
-
-        // Helps immensely with trace performance through phpunit
-        Kint::$max_depth = 3;
-    }
-
     /**
      * @covers \d
      * @covers \Kint\Kint::dump
@@ -51,55 +49,55 @@ class IntegrationTest extends KintTestCase
      */
     public function testBasicDumps()
     {
-        $testdata = array(
+        $testdata = [
             1234,
-            (object) array('abc' => 'def'),
+            (object) ['abc' => 'def'],
             1234.5678,
             'Good news everyone! I\'ve got some bad news!',
             null,
-        );
+        ];
 
         $testdata[] = &$testdata;
 
-        $array_structure = array(
+        $array_structure = [
             '0', 'integer', '1234',
             '1', 'stdClass', '1',
             'public', 'abc', 'string', '3', 'def',
             '2', 'double', '1234.5678',
             '3', 'string', '43', 'Good news everyone! I\'ve got some bad news!',
             '4', 'null',
-        );
+        ];
 
         Kint::$return = true;
         Kint::$cli_detection = false;
         Kint::$display_called_from = false;
 
         Kint::$enabled_mode = Kint::MODE_RICH;
-        $richbase = d($testdata);
+        $richbase = \d($testdata);
 
         $this->assertLike(
             \array_merge(
                 $array_structure,
-                array('&amp;array', '6'),
+                ['&amp;array', '6'],
                 $array_structure,
-                array('&amp;array', 'Recursion')
+                ['&amp;array', 'Recursion']
             ),
             $richbase
         );
 
         Kint::$enabled_mode = true;
-        $this->assertSame($richbase, d($testdata));
+        $this->assertSame($richbase, \d($testdata));
         $this->assertSame($richbase, Kint::dump($testdata));
 
         Kint::$enabled_mode = Kint::MODE_PLAIN;
-        $plainbase = d($testdata);
+        $plainbase = \d($testdata);
 
         $this->assertLike(
             \array_merge(
                 $array_structure,
-                array('&amp;array', '6'),
+                ['&amp;array', '6'],
                 $array_structure,
-                array('&amp;array', 'RECURSION')
+                ['&amp;array', 'RECURSION']
             ),
             $plainbase
         );
@@ -107,17 +105,17 @@ class IntegrationTest extends KintTestCase
         $this->assertSame($plainbase, Kint::dump($testdata));
 
         Kint::$enabled_mode = true;
-        $this->assertSame($plainbase, s($testdata));
+        $this->assertSame($plainbase, \s($testdata));
 
         Kint::$enabled_mode = Kint::MODE_CLI;
-        $clibase = d($testdata);
+        $clibase = \d($testdata);
 
         $this->assertLike(
             \array_merge(
                 $array_structure,
-                array('&array', '6'),
+                ['&array', '6'],
                 $array_structure,
-                array('&array', 'RECURSION')
+                ['&array', 'RECURSION']
             ),
             $clibase
         );
@@ -126,19 +124,28 @@ class IntegrationTest extends KintTestCase
 
         Kint::$enabled_mode = true;
         Kint::$cli_detection = true;
-        $this->assertSame($clibase, d($testdata));
-        $this->assertSame($clibase, s($testdata));
+        $this->assertSame($clibase, \d($testdata));
+
+        CliRenderer::$cli_colors = false;
+        $cli_colorblind_base = \d($testdata);
+        $this->assertNotSame($clibase, $cli_colorblind_base);
+
+        $this->assertSame($cli_colorblind_base, Kint::dump($testdata));
+
+        CliRenderer::$cli_colors = true;
+        $this->assertSame($cli_colorblind_base, \s($testdata));
+
         Kint::$cli_detection = false;
 
         Kint::$enabled_mode = Kint::MODE_TEXT;
-        $textbase = d($testdata);
+        $textbase = \d($testdata);
 
         $this->assertLike(
             \array_merge(
                 $array_structure,
-                array('&array', '6'),
+                ['&array', '6'],
                 $array_structure,
-                array('&array', 'RECURSION')
+                ['&array', 'RECURSION']
             ),
             $textbase
         );
@@ -148,12 +155,15 @@ class IntegrationTest extends KintTestCase
         Kint::$return = false;
         Kint::$enabled_mode = true;
         \ob_start();
-        ~d($testdata);
+        ~\d($testdata);
         $this->assertSame($textbase, \ob_get_clean());
 
+        \ob_start();
         Kint::$enabled_mode = false;
-        $this->assertSame(0, d($testdata));
-        $this->assertSame(0, s($testdata));
+        $this->assertSame(0, \d($testdata));
+        $this->assertSame(0, \s($testdata));
+
+        $this->assertSame('', \ob_get_clean());
     }
 
     /**
@@ -212,6 +222,9 @@ class IntegrationTest extends KintTestCase
 
     /**
      * @covers \Kint\Kint::dump
+     * @covers \Kint\Renderer\RichRenderer::renderHeaderWrapper
+     * @covers \Kint\Renderer\RichRenderer::setCallInfo
+     * @covers \Kint\Renderer\RichRenderer::setStatics
      */
     public function testExpandModifier()
     {
@@ -219,20 +232,106 @@ class IntegrationTest extends KintTestCase
         Kint::$cli_detection = false;
         Kint::$display_called_from = false;
         Kint::$enabled_mode = Kint::MODE_RICH;
+        RichRenderer::$folder = false;
 
-        $value = array('a' => array(1, 2, 3), 'b' => 'c');
+        $value = ['a' => [1, 2, 3], 'b' => 'c'];
 
         $d1 = Kint::dump($value);
 
+        Kint::$expanded = true;
+        $d2 = Kint::dump($value);
+
         Kint::$return = false;
+        Kint::$expanded = false;
+        RichRenderer::$needs_pre_render = true;
+        \ob_start();
+        !Kint::dump($value);
+        $d3 = \ob_get_clean();
+
+        $this->assertNotSame($d1, $d3);
+        $this->assertSame($d2, $d3);
+
+        \libxml_use_internal_errors(true);
+
+        $d1dom = new DOMDocument();
+        $d1dom->loadHtml($d1);
+
+        $d3dom = new DOMDocument();
+        $d3dom->loadHtml($d3);
+
+        $d3x = new DOMXPath($d3dom);
+        $classattrs = $d3x->query('//dt[contains(@class, "kint-parent")]/@class');
+
+        foreach ($classattrs as $attr) {
+            $vals = \explode(' ', $attr->value);
+            $vals = \array_diff($vals, ['kint-show']);
+            $attr->value = \implode(' ', $vals);
+        }
+
+        $this->assertSame($d1dom->saveHtml(), $d3dom->saveHtml());
+    }
+
+    /**
+     * @covers \Kint\Kint::dump
+     * @covers \Kint\Renderer\RichRenderer::renderHeaderWrapper
+     * @covers \Kint\Renderer\RichRenderer::setCallInfo
+     * @covers \Kint\Renderer\RichRenderer::setStatics
+     */
+    public function testExpandModifierFolder()
+    {
+        Kint::$return = true;
+        Kint::$cli_detection = false;
+        Kint::$display_called_from = false;
+        Kint::$enabled_mode = Kint::MODE_RICH;
+        RichRenderer::$folder = true;
+
+        $value = ['a' => [1, 2, 3], 'b' => 'c'];
+
+        $d1 = Kint::dump($value);
+
+        \libxml_use_internal_errors(true);
+
+        $d1dom = new DOMDocument();
+        $d1dom->loadHtml('<body>'.$d1.'</body>');
+        $d1x = new DOMXPath($d1dom);
+        $nodes1 = $d1x->query('//div[contains(@class, "kint-folder")]');
+
+        $this->assertSame(1, $nodes1->length);
+
+        Kint::$return = false;
+        RichRenderer::$needs_folder_render = true;
+        RichRenderer::$needs_pre_render = true;
         \ob_start();
         !Kint::dump($value);
         $d2 = \ob_get_clean();
 
-        $this->assertNotSame($d1, $d2);
+        $d2dom = new DOMDocument();
+        $d2dom->loadHtml('<body>'.$d2.'</body>');
+        $d2x = new DOMXPath($d2dom);
+        $nodes2 = $d2x->query('//div[contains(@class, "kint-folder")]');
 
-        $d3 = \str_replace(' kint-show', '', $d2);
-        $this->assertSame($d1, $d3);
+        $this->assertSame(0, $nodes2->length);
+
+        $classattrs = $d2x->query('//dt[contains(@class, "kint-parent")]/@class');
+
+        foreach ($classattrs as $attr) {
+            $vals = \explode(' ', $attr->value);
+            $vals = \array_diff($vals, ['kint-show']);
+            $attr->value = \implode(' ', $vals);
+        }
+
+        $classattrs = $d1x->query('//div[contains(@class, "kint-rich")]/@class');
+
+        foreach ($classattrs as $attr) {
+            $vals = \explode(' ', $attr->value);
+            $vals = \array_diff($vals, ['kint-file']);
+            $attr->value = \implode(' ', $vals);
+        }
+
+        $nodes1 = \iterator_to_array($nodes1);
+        $nodes1[0]->parentNode->removeChild($nodes1[0]);
+
+        $this->assertSame($d1dom->saveHtml(), $d2dom->saveHtml());
     }
 
     /**
@@ -245,7 +344,7 @@ class IntegrationTest extends KintTestCase
         Kint::$display_called_from = false;
         TextRenderer::$decorations = false;
 
-        $value = array('a' => array(1, 2, 3), 'b' => 'c');
+        $value = ['a' => [1, 2, 3], 'b' => 'c'];
 
         Kint::$return = false;
         Kint::$enabled_mode = Kint::MODE_RICH;
@@ -266,17 +365,11 @@ class IntegrationTest extends KintTestCase
         \ob_start();
         ~Kint::trace();
         $d1 = \ob_get_clean();
-        $bt = \debug_backtrace(true);
-        \array_unshift($bt, array(
-            'line' => __LINE__ - 4,
-            'class' => 'Kint\\Kint',
-            'function' => 'trace',
-            'file' => __FILE__,
-        ));
 
         Kint::$enabled_mode = Kint::MODE_TEXT;
         Kint::$return = true;
 
+        $bt = \debug_backtrace(true);
         $d2 = \preg_replace('/^\\$bt\\b/', 'Kint\\Kint::trace()', Kint::dump($bt));
 
         $this->assertSame($d1, $d2);
@@ -290,10 +383,10 @@ class IntegrationTest extends KintTestCase
         Kint::$return = false;
         Kint::$cli_detection = false;
         Kint::$display_called_from = false;
-        Kint::$max_depth = 1;
+        Kint::$depth_limit = 1;
         Kint::$enabled_mode = Kint::MODE_TEXT;
 
-        $value = array('a' => array(1, 2, 3), 'b' => 'c');
+        $value = ['a' => [1, 2, 3], 'b' => 'c'];
 
         \ob_start();
         +Kint::dump($value);
@@ -304,7 +397,7 @@ class IntegrationTest extends KintTestCase
 
         $this->assertNotSame($d1, $d2);
 
-        Kint::$max_depth = 0;
+        Kint::$depth_limit = 0;
         $d2 = Kint::dump($value);
 
         $this->assertSame($d1, $d2);
@@ -312,15 +405,16 @@ class IntegrationTest extends KintTestCase
 
     /**
      * @covers \Kint\Kint::dump
+     * @covers \Kint\Renderer\RichRenderer::setCallInfo
      */
     public function testReturnModifier()
     {
         Kint::$return = false;
         Kint::$cli_detection = false;
         Kint::$display_called_from = false;
-        Kint::$enabled_mode = Kint::MODE_TEXT;
+        Kint::$enabled_mode = Kint::MODE_RICH;
 
-        $value = array('a' => array(1, 2, 3), 'b' => 'c');
+        $value = ['a' => [1, 2, 3], 'b' => 'c'];
 
         \ob_start();
         $d1 = @Kint::dump($value);
@@ -346,20 +440,8 @@ class IntegrationTest extends KintTestCase
         TextRenderer::$decorations = false;
 
         $bt = \debug_backtrace(true);
-        \array_unshift($bt, array(
-            'class' => 'Kint\\Kint',
-            'file' => __FILE__,
-        ));
-
-        $d2 = Kint::dump(1);
-        $bt[0]['line'] = __LINE__ - 1;
-        $bt[0]['function'] = 'dump';
-        $d1 = \preg_replace('/^\\$bt\\b/', 'Kint\\Kint::dump(1)', Kint::dump($bt));
-        $this->assertSame($d1, $d2);
 
         $d2 = Kint::trace();
-        $bt[0]['line'] = __LINE__ - 1;
-        $bt[0]['function'] = 'trace';
         $d1 = \preg_replace('/^\\$bt\\b/', 'Kint\\Kint::trace()', Kint::dump($bt));
         $this->assertSame($d1, $d2);
 
@@ -368,8 +450,6 @@ class IntegrationTest extends KintTestCase
         \ob_start();
         Kint::trace();
         $d2 = \ob_get_clean();
-        $bt[0]['line'] = __LINE__ - 2;
-        $bt[0]['function'] = 'trace';
         Kint::$return = true;
         $d1 = \preg_replace('/^\\$bt\\b/', 'Kint\\Kint::trace()', Kint::dump($bt));
         $this->assertSame($d1, $d2);
@@ -395,12 +475,12 @@ class IntegrationTest extends KintTestCase
         $firstframe = \end($bt);
 
         if (isset($firstframe['class'])) {
-            Kint::$aliases[] = array($firstframe['class'], $firstframe['function']);
+            Kint::$aliases[] = [$firstframe['class'], $firstframe['function']];
         } else {
             Kint::$aliases[] = $firstframe['function'];
         }
 
-        $d1 = Kint::dump(1);
+        $d1 = Kint::dump([]);
         $d2 = Kint::trace();
 
         $d1 = \explode("\n", $d1);
@@ -412,14 +492,6 @@ class IntegrationTest extends KintTestCase
         $d2 = \implode("\n", $d2);
 
         $this->assertSame($d1, $d2);
-
-        $this->assertLike(
-            array(
-                'Debug Backtrace (1):',
-                Kint::shortenPath($firstframe['file']).':'.$firstframe['line'],
-            ),
-            $d1
-        );
     }
 
     /**
@@ -432,19 +504,13 @@ class IntegrationTest extends KintTestCase
         Kint::$display_called_from = false;
         Kint::$enabled_mode = Kint::MODE_TEXT;
         TextRenderer::$decorations = false;
-        Kint::$aliases = array();
+        Kint::$aliases = [];
 
         $bt = \debug_backtrace(true);
-        \array_unshift($bt, array(
-            'class' => 'Kint\\Kint',
-            'file' => __FILE__,
-        ));
 
-        $d2 = Kint::dump(1);
-        $bt[0]['line'] = __LINE__ - 1;
-        $bt[0]['function'] = 'dump';
-        Kint::$aliases = array(array('Kint\\Kint', 'dump'));
-        $d1 = \preg_replace('/^\\$bt\\b/', 'Kint\\Kint::dump(1)', Kint::dump($bt));
+        $d2 = Kint::trace();
+        Kint::$aliases = [['Kint\\Kint', 'dump']];
+        $d1 = \preg_replace('/^\\$bt\\b/', 'Kint\\Kint::trace()', Kint::dump($bt));
 
         $this->assertSame($d1, $d2);
     }
@@ -475,15 +541,15 @@ class IntegrationTest extends KintTestCase
         Kint::$enabled_mode = Kint::MODE_RICH;
         TextRenderer::$decorations = false;
 
-        $values = array(array(1), array(2), array(3));
+        $values = [[1], [2], [3]];
 
         $d = \call_user_func_array('Kint::dump', $values);
         $this->assertLike(
-            array(
+            [
                 '$0[0]',
                 '$1[0]',
                 '$2[0]',
-            ),
+            ],
             $d
         );
     }
@@ -501,7 +567,7 @@ class IntegrationTest extends KintTestCase
 
         $p1_triggered = false;
         $p1 = new ProxyPlugin(
-            array('resource'),
+            ['resource'],
             Parser::TRIGGER_SUCCESS,
             function () use (&$p1_triggered) {
                 $p1_triggered = true;
@@ -511,14 +577,14 @@ class IntegrationTest extends KintTestCase
         $value = \fopen(__FILE__, 'r');
 
         try {
-            Kint::$plugins = array();
+            Kint::$plugins = [];
             $d1 = Kint::dump($value);
 
-            Kint::$plugins = array(
+            Kint::$plugins = [
                 $p1,
                 'Kint\\Parser\\StreamPlugin',
-            );
-            TextRenderer::$parser_plugin_whitelist = array('Kint\\Parser\\Plugin');
+            ];
+            TextRenderer::$parser_plugin_whitelist = ['Kint\\Parser\\Plugin'];
 
             $this->assertFalse($p1_triggered);
 
@@ -533,11 +599,11 @@ class IntegrationTest extends KintTestCase
 
         $this->assertTrue($p1_triggered);
         $this->assertLike(
-            array(
+            [
                 '$value',
                 'stream resource',
                 Kint::shortenPath(__FILE__),
-            ),
+            ],
             $d2
         );
         $this->assertNotSame($d1, $d2);
@@ -553,10 +619,10 @@ class IntegrationTest extends KintTestCase
     {
         Kint::$file_link_format = 'test_store';
         $this->assertSame('test_store', Kint::$file_link_format);
-        BlobObject::$char_encodings[] = 'this_is_not_a_real_encoding';
-        $this->assertContains('this_is_not_a_real_encoding', BlobObject::$char_encodings);
-        BlobObject::$legacy_encodings[] = 'this_is_also_not_a_real_encoding';
-        $this->assertContains('this_is_also_not_a_real_encoding', BlobObject::$legacy_encodings);
+        BlobValue::$char_encodings[] = 'this_is_not_a_real_encoding';
+        $this->assertContains('this_is_not_a_real_encoding', BlobValue::$char_encodings);
+        BlobValue::$legacy_encodings[] = 'this_is_also_not_a_real_encoding';
+        $this->assertContains('this_is_also_not_a_real_encoding', BlobValue::$legacy_encodings);
     }
 
     /**
@@ -566,8 +632,8 @@ class IntegrationTest extends KintTestCase
     public function testRestore()
     {
         $this->assertNotSame('test_store', Kint::$file_link_format);
-        $this->assertNotContains('this_is_not_a_real_encoding', BlobObject::$char_encodings);
-        $this->assertNotContains('this_is_also_not_a_real_encoding', BlobObject::$legacy_encodings);
+        $this->assertNotContains('this_is_not_a_real_encoding', BlobValue::$char_encodings);
+        $this->assertNotContains('this_is_also_not_a_real_encoding', BlobValue::$legacy_encodings);
     }
 
     /**
@@ -575,7 +641,7 @@ class IntegrationTest extends KintTestCase
      */
     public function testLike()
     {
-        $this->assertLike(array('a', 'b', 'c'), 'foo a bar baz c buzz');
+        $this->assertLike(['a', 'b', 'c'], 'foo a bar baz c buzz');
     }
 
     /**
@@ -583,13 +649,17 @@ class IntegrationTest extends KintTestCase
      */
     public function testNotLike()
     {
+        $caught = false;
+
         try {
-            $this->assertLike(array('a', 'b', 'c', 'o'), 'foo a bar baz c buzz');
+            $this->assertLike(['a', 'b', 'c', 'o'], 'foo a bar baz c buzz');
+        } catch (AssertionFailedError $e) {
+            $caught = true;
         } catch (PHPUnit_Framework_AssertionFailedError $e) {
-            return;
+            $caught = true;
         }
 
-        self::fail('Failed to mismatch');
+        $this->assertTrue($caught, 'Failed to mismatch');
     }
 
     /**
@@ -597,12 +667,24 @@ class IntegrationTest extends KintTestCase
      */
     public function testLikeNonString()
     {
+        $caught = false;
+
         try {
-            $this->assertLike(array('a', 'b', 'c'), array('a', 'b', 'c'));
+            $this->assertLike(['a', 'b', 'c'], ['a', 'b', 'c']);
+        } catch (FrameworkException $e) {
+            $caught = true;
         } catch (PHPUnit_Framework_Exception $e) {
-            return;
+            $caught = true;
         }
 
-        self::fail('Failed to throw');
+        $this->assertTrue($caught, 'Failed to throw');
+    }
+
+    protected function kintUp()
+    {
+        parent::kintUp();
+
+        // Helps immensely with trace performance through phpunit
+        Kint::$depth_limit = 3;
     }
 }
